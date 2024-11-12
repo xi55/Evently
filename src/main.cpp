@@ -28,40 +28,40 @@ int main() {
     Evently::Application<int, std::string> app;
 
     // 测试用例 1：事件订阅和触发
-    {
-        auto event = std::make_shared<TestEvent>();
+    // {
+    //     auto event = std::make_shared<TestEvent>();
         
-        // 订阅事件
-        app.subscribeEvent("TestEvent", event);
+    //     // 订阅事件
+    //     app.subscribeEvent("TestEvent1", event);
 
-        // 发布事件
-        std::cout << "测试用例 1：发布事件 'TestEvent'，参数为 42 和 '你好'" << std::endl;
-        app.publishEvent("TestEvent", std::launch::async, 42, std::string("你好"));
-    }
+    //     // 发布事件
+    //     std::cout << "测试用例 1：发布事件 'TestEvent1'，参数为 42 和 '你好'" << std::endl;
+    //     app.publishEvent("TestEvent1", std::launch::async, 42, std::string("你好"));
+    // }
 
     // 测试用例 2：事件取消订阅
-    {
-        auto event = std::make_shared<TestEvent>();
+    // {
+    //     auto event = std::make_shared<TestEvent>();
         
-        // 订阅事件
-        app.subscribeEvent("TestEvent", event);
+    //     // 订阅事件
+    //     app.subscribeEvent("TestEvent2", event);
 
-        // 取消订阅事件
-        app.unsubscribeEvent("TestEvent", event);
+    //     // 取消订阅事件
+    //     app.unsubscribeEvent("TestEvent2", event);
 
-        // 发布事件，不应触发
-        std::cout << "测试用例 2：取消订阅 'TestEvent' 后再次发布，期望不触发" << std::endl;
-        app.publishEvent("TestEvent", std::launch::async, 42, std::string("你好"));
-    }
+    //     // 发布事件，不应触发
+    //     std::cout << "测试用例 2：取消订阅 'TestEvent2' 后再次发布，期望不触发" << std::endl;
+    //     app.publishEvent("TestEvent2", std::launch::async, 42, std::string("你好"));
+    // }
 
-    // // 测试用例 3：多优先级事件处理
+    // 测试用例 3：多优先级事件处理
     // {
     //     class PriorityEvent : public EventBase {
     //     public:
     //         PriorityEvent(const std::string& name, int priority) : name_(name), priority_(priority) {}
 
     //         std::string getEventName() const override {
-    //             return "PriorityEvent";
+    //             return "PriorityEvent" + std::to_string(priority_);
     //         }
 
     //         void trigger(const std::vector<std::any>& args) override {
@@ -88,22 +88,22 @@ int main() {
     // }
 
     // 测试用例 4：多线程事件处理
-    // {
-    //     auto event1 = std::make_shared<TestEvent>();
-    //     auto event2 = std::make_shared<TestEvent>();
+    {
+        auto event1 = std::make_shared<TestEvent>();
+        auto event2 = std::make_shared<TestEvent>();
 
-    //     // 订阅事件
-    //     app.subscribeEvent("MultiThreadEvent", event1);
-    //     app.subscribeEvent("MultiThreadEvent", event2);
+        // 订阅事件
+        app.subscribeEvent("MultiThreadEvent", event1);
+        app.subscribeEvent("MultiThreadEvent", event2);
 
-    //     // 多线程发布事件
-    //     std::cout << "测试用例 4：多线程环境下发布 'MultiThreadEvent' 事件" << std::endl;
-    //     std::thread t1([&]() { app.publishEvent("MultiThreadEvent", std::launch::async, 100); });
-    //     std::thread t2([&]() { app.publishEvent("MultiThreadEvent", std::launch::async, 200); });
+        // 多线程发布事件
+        std::cout << "测试用例 4：多线程环境下发布 'MultiThreadEvent' 事件" << std::endl;
+        std::thread t1([&]() { app.publishEvent("MultiThreadEvent", std::launch::async, 100); });
+        std::thread t2([&]() { app.publishEvent("MultiThreadEvent", std::launch::async, 200); });
 
-    //     t1.join();
-    //     t2.join();
-    // }
+        t1.join();
+        t2.join();
+    }
 
     return 0;
 }
