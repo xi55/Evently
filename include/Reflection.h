@@ -8,7 +8,8 @@
 #include <memory>
 #include <set>
 #include <vector>
-
+#include <iostream>
+#include <cxxabi.h>
 namespace Evently
 {
         
@@ -115,12 +116,12 @@ namespace Evently
     template <typename T, typename ReturnType, typename... Args>
     std::any MethodInvoker<T, ReturnType, Args...>::invoke(void *instance, const std::vector<std::any> &args) const
     {
-        if (args.size() != sizeof...(Args)) {
-                throw std::invalid_argument("Argument count mismatch");
-            }
-
-            T* obj = static_cast<T*>(instance);
-            return invokeImpl(obj, args, std::index_sequence_for<Args...>{});
+        if (args.size() != sizeof...(Args)) 
+        {
+            throw std::invalid_argument("Argument count mismatch");
+        }
+        T* obj = static_cast<T*>(instance);
+        return invokeImpl(obj, args, std::index_sequence_for<Args...>{});
     }
 
     template <typename T, typename ReturnType, typename... Args>
@@ -129,8 +130,29 @@ namespace Evently
     {
         if constexpr (std::is_void_v<ReturnType>) 
         {
-            // If the function returns void, we just invoke it without returning
-            (obj->*method_)(std::any_cast<Args>(args[Indexes])...);
+            
+            // 打印预期类型和实际类型
+            // auto typeName = [](const char* name) {
+            //     int status = -1;
+            //     std::unique_ptr<char, void(*)(void*)> res{
+            //         abi::__cxa_demangle(name, nullptr, nullptr, &status), std::free};
+            //     if (status != 0) {
+            //         std::cerr << "Demangling failed for: " << name << " with status: " << status << "\n";
+            //     }
+            //     return (status == 0) ? std::string(res.get()) : std::string(name);
+            // };
+
+            // // 使用demangleTypeName来解码类型名的代码
+            // ((std::cout << "预期的参数类型: " << typeName(typeid(Args).name()) 
+            //         << ", 实际的参数类型: " << typeName(args[Indexes].type().name()) << "\n"), ...);
+
+            // 检查并调用方法
+            try {
+                (obj->*method_)(std::any_cast<Args>(args[Indexes])...);
+            } catch (const std::bad_any_cast& e) {
+                std::cerr << "bad_any_cast caught: " << e.what() << "\n";
+                throw;
+            }
             return {};  // Return empty std::any for void return type
         } 
         else 

@@ -1,6 +1,7 @@
 #include "Reflection.h"
 #include <stdexcept>
 #include <functional>
+#include <iostream>
 
 namespace Evently
 {
@@ -51,12 +52,22 @@ namespace Evently
 
     std::any ReflectionRegistry::invokeMethod(const std::string &className, const std::string &methodName, void *instance, const std::vector<std::any> &args) const
     {
+
         auto key = std::make_pair(className, methodName);
         auto it = methods_.find(key);
         if (it != methods_.end()) {
-            return it->second->invoke(instance, args);
+            std::any res;
+            try
+            {
+                res = it->second->invoke(instance, args);
+                return res;
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << "函数调用错误: " << e.what() << '\n';
+            }
         }
-        throw std::runtime_error("Method not found: " + methodName);
+        throw std::runtime_error("没有找到该方法: " + methodName);
     }
 
     std::set<std::string> ReflectionRegistry::getMethodNames(const std::string& className) const {

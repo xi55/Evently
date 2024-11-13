@@ -85,26 +85,10 @@ namespace Evently
             removeAllOccurrences(event_pool_low_, listener);
         }
 
-        template<class T>
-        static void getList(std::vector<std::string> &typeNames, std::vector<std::shared_ptr<void>> &list, T &&t)
-        {
-#if defined(__linux__)
-            int status;
-            char *type = abi::__cxa_demangle(typeid(t).name(), nullptr, nullptr, &status);
-            if (type) 
-            {
-                typeNames.push_back(std::string(type));
-                free(type);
-            }
-#else
-            typeNames.push_back(typeid(t).name());
-#endif
-            list.push_back(std::make_shared<T>(std::forward<T>(t)));
-        }
-       
         template <class... EventArgs>
         static void publishEvent(const std::string &evently_name, std::launch policy, EventArgs&&... args)
         {
+            
             if (show_detailed_) 
             {
                 std::cout << "\n"
@@ -127,7 +111,7 @@ namespace Evently
                 auto handlers = event_pool_high_[evently_name];
                 handlers.insert(handlers.end(), event_pool_[evently_name].begin(), event_pool_[evently_name].end());
                 handlers.insert(handlers.end(), event_pool_low_[evently_name].begin(), event_pool_low_[evently_name].end());
-                auto methodName = std::string(FUNCNAME) + evently_name;
+                auto methodName = std::string(FUNCNAME_PREFIX) + evently_name;
 
                 for (auto& handler : handlers)
                 {
@@ -140,15 +124,15 @@ namespace Evently
                         std::cout << "---------------\n";
                     }
                     // todo: 改进同步策略，本意为相同线程且异步策略下，阻塞运行。
-                    if (std::this_thread::get_id() == handler->getThreadId() || policy == std::launch::async) 
+                    if (std::this_thread::get_id() == handler->getThreadId() || policy != std::launch::async) 
                     {
                         std::cout << "直接运行\n";
-                        invokeDirect(handler, std::forward<EventArgs>(args)...);
+                        invokeDirect(evently_name, handler, std::forward<EventArgs>(args)...);
                     } 
                     else 
                     {
                         std::cout << "子线程运行\n";
-                        queueEvent(handler, std::forward<EventArgs>(args)...);
+                        queueEvent(evently_name, handler, std::forward<EventArgs>(args)...);
                     }
                     
                 }
@@ -225,21 +209,13 @@ namespace Evently
         }
         
         template <typename... CallArgs>
-        static void queueEvent(std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
+        static void queueEvent(const std::string &evently_name, std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
         {
             std::lock_guard<std::mutex> lock(event_queue_mutex_);
+            
 
-            // 确保插入的 tuple 类型是 std::tuple<int, std::string>
-            if constexpr (sizeof...(callArgs) == 2) {
-                // 正常插入两个参数的情况
-                event_queue_.emplace(eventHandler, std::make_tuple(std::forward<CallArgs>(callArgs)...));
-            } else if constexpr (sizeof...(callArgs) == 1) {
-                // 只有一个参数时，填充默认值
-                event_queue_.emplace(eventHandler, std::make_tuple(std::forward<CallArgs>(callArgs)..., std::string{}));
-            } else {
-                // 没有参数时，使用默认的 (0, "")
-                event_queue_.emplace(eventHandler, std::make_tuple(0, std::string{}));
-            }
+            // 使用完备参数包构造所需的三元组
+            event_queue_.emplace(evently_name, eventHandler, std::make_any<std::tuple<std::decay_t<CallArgs>...>>(std::forward<CallArgs>(callArgs)...));
 
             event_cv_.notify_one();
         }
@@ -256,26 +232,44 @@ namespace Evently
                 if (stop_processing_ && event_queue_.empty()) break;
 
                 // 从队列中取出事件
-                auto [handler, args] = event_queue_.front();
+                auto [evently_name, handler, args] = event_queue_.front();
                 event_queue_.pop();
                 lock.unlock();
-                std::vector<std::any> argumentList = tupleToAnyVector(args);
+
                 // 触发事件
                 if (handler) 
                 {
-                    // handler->invokeEvent(argumentList);
+                    if (args.has_value()) 
+                    {
+                        if (args.type() == typeid(std::tuple<>)) 
+                        {
+                            handler->invokeEvent(evently_name, {}); // 无参数情况
+                        } 
+                        else 
+                        {
+                            // todo: 检测参数包
+                            // 尝试将 std::any 转换为具体的 tuple 类型
+                            auto& tuple = std::any_cast<const std::tuple<std::string>&>(args);
+                            std::vector<std::any> argumentList = tupleToAnyVector(tuple);
+                            // auto args_vector = tupleToAnyVector(*args_tuple);
+                            handler->invokeEvent(evently_name, argumentList);
+                        }
+                    }
+                }
+                else
+                {
+                    std::cout << "Error: Handler for event " << evently_name << " is null.\n";
                 }
             }
         }
 
-        // 将 std::tuple 转换为 std::vector<std::any>
         template <typename Tuple, std::size_t... Indexes>
-        std::vector<std::any> tupleToAnyVectorImpl(const Tuple& tuple, std::index_sequence<Indexes...>) {
+        static std::vector<std::any> tupleToAnyVectorImpl(const Tuple& tuple, std::index_sequence<Indexes...>) {
             return {std::any(std::get<Indexes>(tuple))...};
         }
 
         template <typename... TupleArgs>
-        std::vector<std::any> tupleToAnyVector(const std::tuple<TupleArgs...>& tuple) {
+        static std::vector<std::any> tupleToAnyVector(const std::tuple<TupleArgs...>& tuple) {
             return tupleToAnyVectorImpl(tuple, std::index_sequence_for<TupleArgs...>{});
         }
 
@@ -291,8 +285,9 @@ namespace Evently
         static inline std::shared_mutex event_mutex_;
 
         // 跨线程事件队列
+        static inline std::queue<std::tuple<std::string, std::shared_ptr<EventBase>, std::any>> event_queue_;
 
-        static inline std::queue<std::pair<std::shared_ptr<EventBase>, std::tuple<Args...>>> event_queue_;
+        // static inline std::queue<std::tuple<std::string, std::shared_ptr<EventBase>, std::tuple<Args...>>> event_queue_;
         static inline std::mutex event_queue_mutex_;
         static inline std::condition_variable event_cv_;
 
