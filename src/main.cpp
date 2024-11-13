@@ -1,109 +1,43 @@
 #include <iostream>
-#include <memory>
-#include <thread>
-#include "Application.h"
-#include "EventBase.h"
-
-// 自定义事件类，用于测试
-class TestEvent : public EventBase {
+#include <any>
+#include "Evently.h"
+class MyClass 
+{
 public:
-    std::string getEventName() const override {
-        return "TestEvent";
+    MyClass() 
+    {
+        REGISTER_METHOD(MyClass, printMessage);
+        REGISTER_METHOD(MyClass, add);
+        REGISTER_FIELD(MyClass, number);
+        REGISTER_FIELD(MyClass, name);
     }
 
-    void trigger(const std::vector<std::any>& args) override {
-        std::cout << "事件触发，参数:";
-        for (const auto& arg : args) {
-            if (arg.type() == typeid(int)) {
-                std::cout << " " << std::any_cast<int>(arg);
-            } else if (arg.type() == typeid(std::string)) {
-                std::cout << " " << std::any_cast<std::string>(arg);
-            }
-        }
-        std::cout << std::endl;
+    void printMessage(const std::string& msg) {
+        std::cout << "Message: " << msg << std::endl;
     }
+
+    int add(int a, int b) {
+        return a + b;
+    }
+
+    int number = 42;
+    std::string name = "MyClass";
 };
 
-int main() {
-    Evently::Application<int, std::string> app;
+REGISTER_CLASS(MyClass)
 
-    // 测试用例 1：事件订阅和触发
-    // {
-    //     auto event = std::make_shared<TestEvent>();
-        
-    //     // 订阅事件
-    //     app.subscribeEvent("TestEvent1", event);
+int main() 
+{
+    Evently::ReflectionRegistry& registry = Evently::ReflectionRegistry::getInstance();
+    MyClass obj;
 
-    //     // 发布事件
-    //     std::cout << "测试用例 1：发布事件 'TestEvent1'，参数为 42 和 '你好'" << std::endl;
-    //     app.publishEvent("TestEvent1", std::launch::async, 42, std::string("你好"));
-    // }
+    registry.invokeMethod("MyClass", "printMessage", &obj, {std::string("Hello, Reflection!")});
+    int result = std::any_cast<int>(registry.invokeMethod("MyClass", "add", &obj, {3, 5}));
+    std::cout << "Addition result: " << result << std::endl;
 
-    // 测试用例 2：事件取消订阅
-    // {
-    //     auto event = std::make_shared<TestEvent>();
-        
-    //     // 订阅事件
-    //     app.subscribeEvent("TestEvent2", event);
-
-    //     // 取消订阅事件
-    //     app.unsubscribeEvent("TestEvent2", event);
-
-    //     // 发布事件，不应触发
-    //     std::cout << "测试用例 2：取消订阅 'TestEvent2' 后再次发布，期望不触发" << std::endl;
-    //     app.publishEvent("TestEvent2", std::launch::async, 42, std::string("你好"));
-    // }
-
-    // 测试用例 3：多优先级事件处理
-    // {
-    //     class PriorityEvent : public EventBase {
-    //     public:
-    //         PriorityEvent(const std::string& name, int priority) : name_(name), priority_(priority) {}
-
-    //         std::string getEventName() const override {
-    //             return "PriorityEvent" + std::to_string(priority_);
-    //         }
-
-    //         void trigger(const std::vector<std::any>& args) override {
-    //             std::cout << "优先级 " << priority_ << " 事件触发，名称: " << name_ << std::endl;
-    //         }
-
-    //     private:
-    //         std::string name_;
-    //         int priority_;
-    //     };
-
-    //     auto highPriorityEvent = std::make_shared<PriorityEvent>("高优先级", 0);
-    //     auto normalPriorityEvent = std::make_shared<PriorityEvent>("普通优先级", 50);
-    //     auto lowPriorityEvent = std::make_shared<PriorityEvent>("低优先级", 100);
-
-    //     // 按优先级顺序订阅事件
-    //     app.subscribeEvent("PriorityEvent", lowPriorityEvent, 100);
-    //     app.subscribeEvent("PriorityEvent", normalPriorityEvent, 50);
-    //     app.subscribeEvent("PriorityEvent", highPriorityEvent, 0);
-
-    //     // 发布事件
-    //     std::cout << "测试用例 3：发布 'PriorityEvent' 事件，按优先级触发" << std::endl;
-    //     app.publishEvent("PriorityEvent", std::launch::async);
-    // }
-
-    // 测试用例 4：多线程事件处理
-    {
-        auto event1 = std::make_shared<TestEvent>();
-        auto event2 = std::make_shared<TestEvent>();
-
-        // 订阅事件
-        app.subscribeEvent("MultiThreadEvent", event1);
-        app.subscribeEvent("MultiThreadEvent", event2);
-
-        // 多线程发布事件
-        std::cout << "测试用例 4：多线程环境下发布 'MultiThreadEvent' 事件" << std::endl;
-        std::thread t1([&]() { app.publishEvent("MultiThreadEvent", std::launch::async, 100); });
-        std::thread t2([&]() { app.publishEvent("MultiThreadEvent", std::launch::async, 200); });
-
-        t1.join();
-        t2.join();
-    }
+    int number = std::any_cast<int>(registry.getValues("MyClass", "number", &obj));
+    std::string name = std::any_cast<std::string>(registry.getValues("MyClass", "name", &obj));
+    std::cout << "Number: " << number << ", Name: " << name << std::endl;
 
     return 0;
 }

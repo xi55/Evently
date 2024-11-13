@@ -7,6 +7,7 @@
 #include <memory>
 #include <thread>
 #include <any>
+#include "Reflection.h"
 #define FUNCNAME "event_"
 
 class EventBase
@@ -24,15 +25,7 @@ public:
     // 获取事件名称
     virtual std::string getEventName() const = 0;
 
-    // 注册事件处理器
-    // void registerHandler(const std::function<void()>& handler) {
-    //     handlers_.emplace_back(handler);
-    // }
-
-    // 触发事件：调用所有已注册的处理器
-    virtual void trigger(const std::vector<std::any>& args) {
-        
-    }
+    virtual void invokeEvent(const std::string& event_name, const std::vector<std::any>& args) = 0;
 
 protected:
     // 事件处理器列表

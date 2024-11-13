@@ -11,7 +11,6 @@
 #include <mutex>
 #include <thread>
 #include <cassert>
-#include "BaseWork.h"
 #include "EventBase.h"
 #include <queue>
 #include <any>
@@ -140,7 +139,7 @@ namespace Evently
                     {
                         std::cout << "---------------\n";
                     }
-
+                    // todo: 改进同步策略，本意为相同线程且异步策略下，阻塞运行。
                     if (std::this_thread::get_id() == handler->getThreadId() || policy == std::launch::async) 
                     {
                         std::cout << "直接运行\n";
@@ -217,12 +216,12 @@ namespace Evently
         }
 
         template <typename... CallArgs>
-        static void invokeDirect(std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
+        static void invokeDirect(const std::string &evently_name, std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
         {
             std::vector<std::any> arguments = {std::forward<CallArgs>(callArgs)...};
             // 直接调用，带有参数 (根据实际应用需求定制逻辑)
             std::cout << "直接调用，参数数量: " << arguments.size() << "\n";
-            eventHandler->trigger(arguments);
+            eventHandler->invokeEvent(evently_name, arguments);
         }
         
         template <typename... CallArgs>
@@ -264,7 +263,7 @@ namespace Evently
                 // 触发事件
                 if (handler) 
                 {
-                    handler->trigger(argumentList);
+                    // handler->invokeEvent(argumentList);
                 }
             }
         }
