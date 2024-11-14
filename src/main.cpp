@@ -10,9 +10,15 @@
 #include "Reflection.h"
 #include "Evently.h" 
 
-class MyListener : public EventBase {
+class MyListener : public SharedEventBase<MyListener> {
 public:
-    MyListener() = default;
+    MyListener()
+    {
+        auto self = shared_from_this();
+        Evently::Application<>::getInstance().subscribeEvent("testEvent", self);
+        Evently::Application<>::getInstance().subscribeEvent("numericEvent", self);
+        Evently::Application<>::getInstance().subscribeEvent("mixedEvent", self);
+    }
     std::string getEventName() const override { return "MyListener"; }
 
     void event_testEvent(const std::string& message) {
@@ -36,21 +42,18 @@ REGISTER_METHOD(MyListener, event_mixedEvent)
 
 int main() {
     Evently::ReflectionRegistry& registry = Evently::ReflectionRegistry::getInstance();
-    Evently::Application<> app;
 
     std::shared_ptr<MyListener> listener = std::make_shared<MyListener>();
-    app.subscribeEvent("testEvent", listener);
-    app.subscribeEvent("numericEvent", listener);
-    app.subscribeEvent("mixedEvent", listener);
+    
 
     std::cout << "发布事件 testEvent...\n";
-    app.publishEvent("testEvent", std::launch::async, std::string("来自 testEvent 的消息"));
+    Evently::Application<>::getInstance().publishEvent("testEvent", std::launch::async, std::string("来自 testEvent 的消息"));
 
     std::cout << "发布事件 numericEvent...\n";
-    app.publishEvent("numericEvent", std::launch::async, 42, 3.14);
+    Evently::Application<>::getInstance().publishEvent("numericEvent", std::launch::async, 42, 3.14);
 
     std::cout << "发布事件 mixedEvent...\n";
-    app.publishEvent("mixedEvent", std::launch::async, std::string("Alice"), 30, true);
+    Evently::Application<>::getInstance().publishEvent("mixedEvent", std::launch::async, std::string("Alice"), 30, true);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 

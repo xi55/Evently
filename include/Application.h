@@ -34,20 +34,13 @@ namespace Evently
     {
     public:
 
-        Application() : stop_processing_(false) {
-            // 启动事件处理线程
-            
-            event_processing_thread_ = std::thread(&Application::processEvents, this);
-            
-        }
+        Application(const Application&) = delete;
+        Application& operator=(const Application&) = delete;
 
-        ~Application() {
-            // 停止事件处理线程
-            stop_processing_ = true;
-            event_cv_.notify_all();
-            if (event_processing_thread_.joinable()) {
-                event_processing_thread_.join();
-            }
+        // 单例访问接口
+        static Application& getInstance() {
+            static Application instance;
+            return instance;
         }
 
         // 注册事件监听器
@@ -86,7 +79,7 @@ namespace Evently
         }
 
         template <class... EventArgs>
-        static void publishEvent(const std::string &evently_name, std::launch policy, EventArgs&&... args)
+        void publishEvent(const std::string &evently_name, std::launch policy, EventArgs&&... args)
         {
             
             if (show_detailed_) 
@@ -104,6 +97,9 @@ namespace Evently
             assert(numArgs <= 10 && "事件参数数量不得超过10");
 
             std::unique_lock<std::mutex> lock(event_queue_mutex_);
+            std::cout << "---- event_pool_high_ ----" << event_pool_high_.size() << std::endl;
+            std::cout << "---- event_pool_ ----" << event_pool_.size() << std::endl;
+            std::cout << "---- event_pool_low_ ----" << event_pool_low_.size() << std::endl;
             if (event_pool_high_.count(evently_name) ||
                 event_pool_.count(evently_name)      ||
                 event_pool_low_.count(evently_name))
@@ -112,7 +108,7 @@ namespace Evently
                 handlers.insert(handlers.end(), event_pool_[evently_name].begin(), event_pool_[evently_name].end());
                 handlers.insert(handlers.end(), event_pool_low_[evently_name].begin(), event_pool_low_[evently_name].end());
                 auto methodName = std::string(FUNCNAME_PREFIX) + evently_name;
-
+                std::cout << "---- handlers ----" << handlers.size() << std::endl;
                 for (auto& handler : handlers)
                 {
                     if (handler) 
@@ -141,6 +137,22 @@ namespace Evently
         }
 
     private:
+
+        Application() : stop_processing_(false) {
+            // 启动事件处理线程
+            
+            event_processing_thread_ = std::thread(&Application::processEvents, this);
+            
+        }
+
+        ~Application() {
+            // 停止事件处理线程
+            stop_processing_ = true;
+            event_cv_.notify_all();
+            if (event_processing_thread_.joinable()) {
+                event_processing_thread_.join();
+            }
+        }
 
         // 获取事件池
         std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>>& getEventPool(int priority) {
@@ -200,7 +212,7 @@ namespace Evently
         }
 
         template <typename... CallArgs>
-        static void invokeDirect(const std::string &evently_name, std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
+        void invokeDirect(const std::string &evently_name, std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
         {
             std::vector<std::any> arguments = {std::forward<CallArgs>(callArgs)...};
             // 直接调用，带有参数 (根据实际应用需求定制逻辑)
@@ -209,7 +221,7 @@ namespace Evently
         }
         
         template <typename... CallArgs>
-        static void queueEvent(const std::string &evently_name, std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
+        void queueEvent(const std::string &evently_name, std::shared_ptr<EventBase> eventHandler, CallArgs&&... callArgs) 
         {
             std::lock_guard<std::mutex> lock(event_queue_mutex_);
             
@@ -264,32 +276,32 @@ namespace Evently
         }
 
         template <typename Tuple, std::size_t... Indexes>
-        static std::vector<std::any> tupleToAnyVectorImpl(const Tuple& tuple, std::index_sequence<Indexes...>) {
+        std::vector<std::any> tupleToAnyVectorImpl(const Tuple& tuple, std::index_sequence<Indexes...>) {
             return {std::any(std::get<Indexes>(tuple))...};
         }
 
         template <typename... TupleArgs>
-        static std::vector<std::any> tupleToAnyVector(const std::tuple<TupleArgs...>& tuple) {
+        std::vector<std::any> tupleToAnyVector(const std::tuple<TupleArgs...>& tuple) {
             return tupleToAnyVectorImpl(tuple, std::index_sequence_for<TupleArgs...>{});
         }
 
 
-        static inline bool show_detailed_ = true;
+        bool show_detailed_ = true;
         // 高优先级事件池
-        static inline std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>> event_pool_high_;
+        std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>> event_pool_high_;
         // 默认优先级事件池
-        static inline std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>> event_pool_;
+        std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>> event_pool_;
         // 低优先级事件池
-        static inline std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>> event_pool_low_;
+        std::unordered_map<std::string, std::vector<std::shared_ptr<EventBase>>> event_pool_low_;
         // 事件池锁
-        static inline std::shared_mutex event_mutex_;
+        std::shared_mutex event_mutex_;
 
         // 跨线程事件队列
-        static inline std::queue<std::tuple<std::string, std::shared_ptr<EventBase>, std::any>> event_queue_;
+        std::queue<std::tuple<std::string, std::shared_ptr<EventBase>, std::any>> event_queue_;
 
-        // static inline std::queue<std::tuple<std::string, std::shared_ptr<EventBase>, std::tuple<Args...>>> event_queue_;
-        static inline std::mutex event_queue_mutex_;
-        static inline std::condition_variable event_cv_;
+        // std::queue<std::tuple<std::string, std::shared_ptr<EventBase>, std::tuple<Args...>>> event_queue_;
+        std::mutex event_queue_mutex_;
+        std::condition_variable event_cv_;
 
         std::thread event_processing_thread_;  // 事件处理线程
         std::atomic<bool> stop_processing_;    // 控制线程结束的标志

@@ -33,13 +33,6 @@ public:
         auto& registry = Evently::ReflectionRegistry::getInstance();
         // 使用 demangleTypeName 解码类名
         std::string class_name = demangleTypeName(typeid(*this));
-        // std::cout << "Attempting to invoke method: " << method_name << " on class " << class_name << "\n";
-        // std::cout << "Arguments passed to method: " << args.size() << " arguments\n";
-        // for (const auto& arg : args) {
-        //     std::cout << " - Argument type: " << demangleTypeName(arg.type()) << "\n";
-        // }
-        
-        
         try
         {
             
@@ -80,6 +73,13 @@ protected:
         list.push_back(std::make_shared<T>(std::forward<T>(t)));
     }
 
+};
+
+template <typename Derived>
+class SharedEventBase : public EventBase, public std::enable_shared_from_this<Derived> {
+public:
+    // 可以在基类中定义公共的功能和接口
+    virtual ~SharedEventBase() = default;
 };
 
 #endif // EVENT_BASE_H
